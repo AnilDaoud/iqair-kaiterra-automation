@@ -1,0 +1,5 @@
+requests
+broadlink
+configparser
+python-aqi
+logger
