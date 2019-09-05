@@ -1,4 +1,4 @@
-#! python3
+#! /usr/bin/env python3
 
 import broadlink
 import configparser
@@ -42,7 +42,7 @@ def send(dev, command):
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',datefmt='%m-%d %H:%M:%S')
 
 # Load config file
-config_file = os.path.join(os.getcwd(),"config.ini")
+config_file = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),"config.ini")
 if not(os.path.isfile(config_file)):
     logging.error('IQAIR file error: %s does not exist' % iqair_file)
     sys.exit(2)
