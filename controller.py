@@ -2,7 +2,7 @@
 
 import broadlink
 import configparser
-import os, sys
+import sys
 import json
 import aqi
 import requests
@@ -46,14 +46,9 @@ logdtformat = '%m-%d %H:%M:%S'
 logging.basicConfig(level=logging.DEBUG, format=logformatstring,datefmt=logdtformat)
 
 # Load config file
-config_file = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),"config.ini")
-if not(os.path.isfile(config_file)):
-    logging.error('Config file %s does not exist' % iqair_file)
-    sys.exit(2)
-else:
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    logging.info("Loaded config file config.ini")
+config_file = Path(sys.argv[0]).resolve().parents[0] / 'config.ini'
+config = configparser.ConfigParser()
+config.read_file(open(config_file))
 
 # do we log to a file as well?
 try:
@@ -66,17 +61,25 @@ except KeyError as e:
     logging.info("Config file does not specifiy existing logfile")
 
 # Initialize blaster
-devicetype = int(config['rmmini3']['type'],0)
-host = config['rmmini3']['rm_ip']
-mac = bytearray.fromhex(config['rmmini3']['rm_mac'])
+try:
+    devicetype = int(config['rmmini3']['type'],0)
+    host = config['rmmini3']['rm_ip']
+    mac = bytearray.fromhex(config['rmmini3']['rm_mac'])
+except KeyError as e:
+    logging.error("RM Mini 3 settings not found in config file")
+    sys.exit(2)
 dev = broadlink.gendevice(devicetype, (host, 80), mac)
 dev.auth()
 logging.info("Successfully initialized RM Mini 3")
 
 # Kaiterra device
-API_BASE_URL=config['LaserEgg']['api_base_url']
-API_KEY=config['LaserEgg']['api_key']
-DEVICE_ID=config['LaserEgg']['device_id']
+try:
+    API_BASE_URL=config['LaserEgg']['api_base_url']
+    API_KEY=config['LaserEgg']['api_key']
+    DEVICE_ID=config['LaserEgg']['device_id']
+except KeyError as e:
+    logging.error("LaserEgg settings not found in config file")
+    sys.exit(2)
 
 last_update = -1
 while True:
