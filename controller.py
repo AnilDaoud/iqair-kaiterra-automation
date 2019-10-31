@@ -9,6 +9,7 @@ import requests
 import logging
 from datetime import datetime, timezone
 from time import sleep
+from pathlib import Path
 
 def laseregg_read(base_url,device,key):
     url = base_url.strip("/") + '/lasereggs/' + device
@@ -39,17 +40,30 @@ def laseregg_read(base_url,device,key):
 def send(dev, command):
     dev.send_data(bytearray.fromhex(command))
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',datefmt='%m-%d %H:%M:%S')
+logformatstring = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+logformat = logging.Formatter(logformatstring)
+logdtformat = '%m-%d %H:%M:%S'
+logging.basicConfig(level=logging.DEBUG, format=logformatstring,datefmt=logdtformat)
 
 # Load config file
 config_file = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),"config.ini")
 if not(os.path.isfile(config_file)):
-    logging.error('IQAIR file error: %s does not exist' % iqair_file)
+    logging.error('Config file %s does not exist' % iqair_file)
     sys.exit(2)
 else:
     config = configparser.ConfigParser()
     config.read(config_file)
     logging.info("Loaded config file config.ini")
+
+# do we log to a file as well?
+try:
+    Path(config['log']['logfile']).touch()
+    fh = logging.FileHandler(config['log']['logfile'])
+    fh.setFormatter(logformat)
+    logging.getLogger().addHandler(fh)
+    logging.info("Logging to %s too" % config['log']['logfile'])
+except KeyError as e:
+    logging.info("Config file does not specifiy existing logfile")
 
 # Initialize blaster
 devicetype = int(config['rmmini3']['type'],0)
