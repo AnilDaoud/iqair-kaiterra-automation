@@ -87,7 +87,11 @@ while True:
     logging.info("Reading %s seconds ago, AQI: %s" % (int(ts), aqi_us))
     if ts > 60*5 or aqi_us < 0:
         str_update = "Last update " + str((datetime.now(timezone.utc) - last_update).total_seconds()) + " ago." if last_update != -1 else "Never updated"
-        logging.info("No update in readings, skipping. " + str_update)
+        if ts > 60*20:
+            send(dev, config['IQAir']['one'])
+            logging.info("No update in 20mins, sending 1 to IQAir")
+        else:
+            logging.info("No update in readings, skipping. " + str_update)
         sleep(60*5)
         continue
     try:
