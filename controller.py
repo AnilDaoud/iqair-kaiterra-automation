@@ -3,6 +3,7 @@
 import broadlink
 import configparser
 import sys
+import os
 import json
 import aqi
 import requests
@@ -19,7 +20,7 @@ def laseregg_read(base_url,device,key):
     try:
         response = session.get(url,params=params, headers={})
         response.raise_for_status()
-    except ConnectionError as err:
+    except requests.exceptions.RequestException as err:
         logging.error(err)
         return -1, -1
     data = json.loads(response.content).get('info.aqi')
@@ -69,8 +70,25 @@ except KeyError as e:
     logging.error("RM Mini 3 settings not found in config file")
     sys.exit(2)
 dev = broadlink.gendevice(devicetype, (host, 80), mac)
-dev.auth()
-logging.info("Successfully initialized RM Mini 3")
+
+try:
+    dev.auth()
+    logging.info("Successfully initialized RM Mini 3")
+except broadlink.exceptions.DeviceOfflineError as e:
+    logging.error("The RM2 device at %s is offline" % host)
+    no_device = True
+    logging.info("Trying to find RM2 device elsewhere on network")
+    devices = broadlink.discover(5)
+    for d in devices:
+        if d.auth():
+            if d.type == 'RM2':
+                logging.info("Found RM2 device host %s, mac %s" % (d.host[0], ':'.join(format(x, '02x') for x in d.mac)))
+                logging.info("Update config.ini file with above info for faster startup next time")
+                dev = d
+                no_device = False
+    if no_device:
+        logging.error("No RM2 device found on network, exiting.")
+        sys.exit(2)
 
 # Kaiterra device
 try:
@@ -82,6 +100,7 @@ except KeyError as e:
     sys.exit(2)
 
 last_update = -1
+statusfile = config['log']['statusfile']
 while True:
     ts, aqi_us = laseregg_read(API_BASE_URL,DEVICE_ID,API_KEY)
     logging.info("Reading %s seconds ago, AQI: %s" % (int(ts), aqi_us))
@@ -96,18 +115,23 @@ while True:
         continue
     try:
         if aqi_us > 70:
+            sent = 6
             send(dev, config['IQAir']['six'])
             logging.info("Sent 6 to ir blaster")
         elif aqi_us > 50:
+            sent = 5
             send(dev, config['IQAir']['five'])
             logging.info("Sent 5 to ir blaster")
         elif aqi_us > 40:
+            sent = 4
             send(dev, config['IQAir']['four'])
             logging.info("Sent 4 to ir blaster")
         elif aqi_us > 20:
+            sent = 2
             send(dev, config['IQAir']['two'])
             logging.info("Sent 2 to ir blaster")
         else:
+            sent = 1
             send(dev, config['IQAir']['one'])
             logging.info("Sent 1 to ir blaster")
     except Exception as err:
@@ -115,5 +139,10 @@ while True:
         sleep(60*5)
         continue
     last_update = datetime.now(timezone.utc)
+    if os.access(statusfile, os.W_OK):
+        with open(statusfile,'w') as out:
+            out.write('\n'.join(['Sent '+str(sent),'At '+ last_update.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z (UTC%z)')]))
+    else:
+        logging.error("Statusfile %s is not writeable or does not exist" % statusfile)
     sleep(60*15)
 
